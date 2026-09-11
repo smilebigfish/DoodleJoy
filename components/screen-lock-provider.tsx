@@ -8,7 +8,9 @@ import {
   useMemo,
   useRef,
   useState,
+  type ReactNode,
 } from "react";
+import Link from "next/link";
 
 const LOCK_KEY = "doodlejoy-locked";
 
@@ -16,6 +18,7 @@ type ScreenLockContextValue = {
   locked: boolean;
   lock: () => Promise<void>;
   unlock: () => Promise<void>;
+  refreshGuards: () => Promise<void>;
 };
 
 const ScreenLockContext = createContext<ScreenLockContextValue | null>(null);
@@ -23,7 +26,7 @@ const ScreenLockContext = createContext<ScreenLockContextValue | null>(null);
 export const ScreenLockProvider = ({
   children,
 }: {
-  children: React.ReactNode;
+  children: ReactNode;
 }) => {
   const [locked, setLocked] = useState(false);
   const wakeLockRef = useRef<WakeLockSentinel | null>(null);
@@ -37,12 +40,20 @@ export const ScreenLockProvider = ({
     setLocked(next);
   };
 
-  const requestGuards = async () => {
+  const applyGuards = useCallback(async () => {
     try {
-      await document.documentElement.requestFullscreen();
+      if (!document.fullscreenElement) {
+        await document.documentElement.requestFullscreen();
+      }
     } catch {
       /* 瀏覽器可能拒絕全螢幕 */
     }
+    try {
+      await wakeLockRef.current?.release();
+    } catch {
+      /* 可忽略 */
+    }
+    wakeLockRef.current = null;
     try {
       if (navigator.wakeLock) {
         wakeLockRef.current = await navigator.wakeLock.request("screen");
@@ -50,7 +61,7 @@ export const ScreenLockProvider = ({
     } catch {
       /* 可忽略 */
     }
-  };
+  }, []);
 
   const releaseGuards = async () => {
     try {
@@ -76,8 +87,8 @@ export const ScreenLockProvider = ({
     // sessionStorage 只能在掛載後讀，避免 SSR / hydration 不一致
     // eslint-disable-next-line react-hooks/set-state-in-effect -- restore lock flag from sessionStorage
     persist(true);
-    void requestGuards();
-  }, []);
+    void applyGuards();
+  }, [applyGuards]);
 
   useEffect(() => {
     if (!locked) {
@@ -90,14 +101,7 @@ export const ScreenLockProvider = ({
     window.addEventListener("popstate", handlePop);
     const handleWake = () => {
       if (document.visibilityState === "visible") {
-        void navigator.wakeLock
-          ?.request("screen")
-          .then((sentinel) => {
-            wakeLockRef.current = sentinel;
-          })
-          .catch(() => {
-            /* 可忽略 */
-          });
+        void applyGuards();
       }
     };
     document.addEventListener("visibilitychange", handleWake);
@@ -105,12 +109,12 @@ export const ScreenLockProvider = ({
       window.removeEventListener("popstate", handlePop);
       document.removeEventListener("visibilitychange", handleWake);
     };
-  }, [locked]);
+  }, [locked, applyGuards]);
 
   const lock = useCallback(async () => {
     persist(true);
-    await requestGuards();
-  }, []);
+    await applyGuards();
+  }, [applyGuards]);
 
   const unlock = useCallback(async () => {
     persist(false);
@@ -118,8 +122,8 @@ export const ScreenLockProvider = ({
   }, []);
 
   const value = useMemo(
-    () => ({ locked, lock, unlock }),
-    [locked, lock, unlock],
+    () => ({ locked, lock, unlock, refreshGuards: applyGuards }),
+    [locked, lock, unlock, applyGuards],
   );
 
   return (
@@ -135,4 +139,38 @@ export const useScreenLock = () => {
     throw new Error("useScreenLock 必須在 ScreenLockProvider 內");
   }
   return context;
+};
+
+type AppLinkProps = {
+  href: string;
+  ariaLabel: string;
+  className?: string;
+  children: ReactNode;
+  onClick?: () => void;
+};
+
+export const AppLink = ({
+  href,
+  ariaLabel,
+  className,
+  children,
+  onClick,
+}: AppLinkProps) => {
+  const { locked, refreshGuards } = useScreenLock();
+  return (
+    <Link
+      href={href}
+      aria-label={ariaLabel}
+      tabIndex={0}
+      className={className}
+      onClick={() => {
+        onClick?.();
+        if (locked) {
+          void refreshGuards();
+        }
+      }}
+    >
+      {children}
+    </Link>
+  );
 };

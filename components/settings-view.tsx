@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Home } from "lucide-react";
 import { BlobDecor } from "@/components/blob-decor";
-import { useScreenLock } from "@/components/screen-lock-provider";
+import { AppLink, useScreenLock } from "@/components/screen-lock-provider";
 import { getSettings, saveSettings, type Settings } from "@/lib/db";
 import { PALETTE_SIZES, type PaletteSize } from "@/lib/palette";
 import { cn } from "@/lib/cn";
@@ -31,16 +32,17 @@ const SettingsField = ({ legend, description, children }: SettingsFieldProps) =>
 );
 
 export const SettingsView = () => {
+  const router = useRouter();
   const { locked } = useScreenLock();
   const [settings, setSettings] = useState<Settings | null>(null);
 
   useEffect(() => {
     if (locked) {
-      window.location.replace("/");
+      router.replace("/");
       return;
     }
     void getSettings().then(setSettings);
-  }, [locked]);
+  }, [locked, router]);
 
   const handlePaletteSize = async (size: Settings["paletteSize"]) => {
     if (!settings) {
@@ -60,15 +62,13 @@ export const SettingsView = () => {
       <BlobDecor />
       <main className="relative mx-auto flex h-full min-h-0 w-full max-w-lg flex-col gap-5 px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(1.5rem,env(safe-area-inset-top))] md:max-w-xl">
         <header className="flex shrink-0 items-center gap-3">
-          {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
-          <a
+          <AppLink
             href="/"
-            aria-label="回家"
-            tabIndex={0}
+            ariaLabel="回家"
             className="kid-press inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-white font-bold text-ink shadow-kid focus-visible:outline-4 focus-visible:outline-mint"
           >
             <Home strokeWidth={3} className="h-7 w-7" />
-          </a>
+          </AppLink>
           <div className="min-w-0">
             <h1 className="font-display text-2xl font-bold text-ink">設定</h1>
             <p className="text-sm font-semibold text-ink/60">給家長調整，小朋友畫的時候不會看到這裡。</p>

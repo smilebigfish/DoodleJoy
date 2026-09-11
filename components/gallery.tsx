@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Download, Pencil, Trash2, X } from "lucide-react";
 import { ConfirmSheet } from "@/components/confirm-sheet";
+import { useScreenLock } from "@/components/screen-lock-provider";
 import { deleteArtwork, type Artwork } from "@/lib/db";
-import { orientationFromSize } from "@/lib/drawing";
 import { setPendingSession } from "@/lib/session-art";
 
 type GalleryProps = {
@@ -15,30 +16,9 @@ type GalleryProps = {
 
 const LONG_PRESS_MS = 650;
 
-const startEdit = async (art: Artwork) => {
-  const url = URL.createObjectURL(art.thumbnail);
-  const orientation = await new Promise<"portrait" | "landscape">((resolve) => {
-    const image = new Image();
-    image.onload = () => {
-      URL.revokeObjectURL(url);
-      resolve(orientationFromSize(image.width, image.height));
-    };
-    image.onerror = () => {
-      URL.revokeObjectURL(url);
-      resolve("portrait");
-    };
-    image.src = url;
-  });
-  setPendingSession({
-    orientation,
-    editId: art.id,
-  });
-  // 進畫頁用整頁導向，避免舊畫布狀態殘留
-  // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- full reload clears canvas
-  window.location.assign("/draw");
-};
-
 export const Gallery = ({ artworks, locked = false, onChange }: GalleryProps) => {
+  const router = useRouter();
+  const { refreshGuards } = useScreenLock();
   const [active, setActive] = useState<Artwork | null>(null);
   const [pendingDelete, setPendingDelete] = useState<Artwork | null>(null);
   const [thumbUrls, setThumbUrls] = useState<Record<string, string>>({});
@@ -57,6 +37,16 @@ export const Gallery = ({ artworks, locked = false, onChange }: GalleryProps) =>
       Object.values(urls).forEach((url) => URL.revokeObjectURL(url));
     };
   }, [artworks]);
+
+  const handleEdit = (art: Artwork) => {
+    setPendingSession({
+      editId: art.id,
+    });
+    if (locked) {
+      void refreshGuards();
+    }
+    router.push("/draw");
+  };
 
   const handleClearTimer = () => {
     if (longPressTimer.current) {
@@ -159,7 +149,7 @@ export const Gallery = ({ artworks, locked = false, onChange }: GalleryProps) =>
               tabIndex={0}
               aria-label="繼續畫"
               className="overflow-hidden rounded-[24px] bg-paper"
-              onClick={() => void startEdit(active)}
+              onClick={() => handleEdit(active)}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
@@ -183,7 +173,7 @@ export const Gallery = ({ artworks, locked = false, onChange }: GalleryProps) =>
                 tabIndex={0}
                 aria-label="繼續畫"
                 className="kid-press flex h-16 items-center justify-center rounded-[24px] bg-coral text-white shadow-kid"
-                onClick={() => void startEdit(active)}
+                onClick={() => handleEdit(active)}
               >
                 <Pencil strokeWidth={3} className="h-7 w-7" />
               </button>

@@ -5,8 +5,8 @@ import { Lock, PencilLine, Settings } from "lucide-react";
 import { BlobDecor } from "@/components/blob-decor";
 import { Gallery } from "@/components/gallery";
 import { KidButton } from "@/components/kid-button";
-import { UnlockHoldButton } from "@/components/unlock-hold-button";
-import { useScreenLock } from "@/components/screen-lock-provider";
+import { UnlockButton } from "@/components/unlock-button";
+import { AppLink, useScreenLock } from "@/components/screen-lock-provider";
 import { listArtworks, type Artwork } from "@/lib/db";
 import { setPendingSession } from "@/lib/session-art";
 
@@ -44,15 +44,14 @@ export const HomeView = () => {
           </h1>
         </header>
 
-        <a
+        <AppLink
           href="/draw"
-          aria-label="開始塗鴉"
-          tabIndex={0}
+          ariaLabel="開始塗鴉"
           className="kid-press inline-flex h-[84px] w-full shrink-0 items-center justify-center rounded-[28px] bg-coral text-white shadow-kid focus-visible:outline-4 focus-visible:outline-mint md:h-24"
           onClick={handleStartBlank}
         >
           <PencilLine strokeWidth={3} className="h-10 w-10 md:h-12 md:w-12" />
-        </a>
+        </AppLink>
 
         <section
           aria-label="我的畫"
@@ -69,17 +68,19 @@ export const HomeView = () => {
       <div className="pointer-events-none absolute right-5 bottom-[max(1.25rem,env(safe-area-inset-bottom))] z-30">
         <div className="pointer-events-auto flex items-center gap-3">
           {!locked ? (
-            <a
+            <AppLink
               href="/settings"
-              aria-label="設定"
-              tabIndex={0}
+              ariaLabel="設定"
               className="kid-press inline-flex h-14 w-14 items-center justify-center rounded-full bg-white font-bold text-ink shadow-kid focus-visible:outline-4 focus-visible:outline-mint md:h-16 md:w-16"
             >
               <Settings strokeWidth={3} className="h-7 w-7" />
-            </a>
+            </AppLink>
           ) : null}
           {locked ? (
-            <UnlockHoldButton onUnlock={() => void unlock()} />
+            <UnlockButton
+              className="h-14 w-14 md:h-16 md:w-16"
+              onUnlock={() => void unlock()}
+            />
           ) : (
             <KidButton
               variant="sun"

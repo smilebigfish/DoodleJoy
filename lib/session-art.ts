@@ -1,7 +1,6 @@
 export type CanvasOrientation = "portrait" | "landscape";
 
 export type PendingSession = {
-  orientation: CanvasOrientation | null;
   editId: string | null;
 };
 

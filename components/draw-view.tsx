@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Check, Home, ImagePlus, Redo2, Save, Undo2, ZoomIn, ZoomOut } from "lucide-react";
 import { CanvasBoard, type CanvasBoardHandle } from "@/components/canvas-board";
 import { KidButton } from "@/components/kid-button";
 import { OrientationSheet } from "@/components/orientation-sheet";
 import { Toolbar } from "@/components/toolbar";
-import { UnlockHoldButton } from "@/components/unlock-hold-button";
-import { useScreenLock } from "@/components/screen-lock-provider";
+import { UnlockButton } from "@/components/unlock-button";
+import { AppLink, useScreenLock } from "@/components/screen-lock-provider";
 import {
   getArtwork,
   getSettings,
@@ -17,7 +18,7 @@ import {
   type CustomColors,
   type Settings,
 } from "@/lib/db";
-import { DEFAULT_BRUSH, blobToDataUrl, dataUrlToBlob, readImageFile, type Tool } from "@/lib/drawing";
+import { DEFAULT_BRUSH, blobToDataUrl, dataUrlToBlob, orientationFromSize, readImageFile, type Tool } from "@/lib/drawing";
 import {
   ratioForOrientation,
   takePendingSession,
@@ -30,7 +31,8 @@ import { cn } from "@/lib/cn";
 export const DrawView = () => {
   const boardRef = useRef<CanvasBoardHandle>(null);
   const fileRef = useRef<HTMLInputElement>(null);
-  const { locked, unlock } = useScreenLock();
+  const { locked, unlock, refreshGuards } = useScreenLock();
+  const router = useRouter();
   const [backgroundSrc, setBackgroundSrc] = useState<string | null>(null);
   const [overlaySrc, setOverlaySrc] = useState<string | null>(null);
   const [orientation, setOrientation] = useState<CanvasOrientation | null>(null);
@@ -53,15 +55,27 @@ export const DrawView = () => {
     let cancelled = false;
     const pending = takePendingSession();
     /* eslint-disable react-hooks/set-state-in-effect -- 從 sessionStorage 還原進畫頁，只能在 client 掛載後做 */
-    if (pending?.orientation) {
-      setOrientation(pending.orientation);
-    }
     if (pending?.editId) {
       setEditId(pending.editId);
       void getArtwork(pending.editId).then(async (art) => {
         if (cancelled || !art) {
           return;
         }
+        const url = URL.createObjectURL(art.png);
+        const image = new Image();
+        image.onload = () => {
+          URL.revokeObjectURL(url);
+          if (!cancelled) {
+            setOrientation(orientationFromSize(image.width, image.height));
+          }
+        };
+        image.onerror = () => {
+          URL.revokeObjectURL(url);
+          if (!cancelled) {
+            setOrientation("portrait");
+          }
+        };
+        image.src = url;
         if (art.overlayPng && art.inkPng) {
           const [inkUrl, overlayUrl] = await Promise.all([
             blobToDataUrl(art.inkPng),
@@ -179,16 +193,13 @@ export const DrawView = () => {
   return (
     <div className="flex h-dvh flex-col overflow-hidden overscroll-none bg-cream">
       <header className="flex shrink-0 flex-wrap items-center gap-1.5 px-2 pb-1.5 pt-[max(0.35rem,env(safe-area-inset-top))]">
-        {/* 完整重新載入，避免畫布殘留狀態 */}
-        {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
-        <a
+        <AppLink
           href="/"
-          aria-label="回家"
-          tabIndex={0}
+          ariaLabel="回家"
           className="kid-press inline-flex h-12 w-12 items-center justify-center rounded-full bg-white px-0 font-bold text-ink shadow-kid focus-visible:outline-4 focus-visible:outline-mint"
         >
           <Home strokeWidth={3} className="h-6 w-6" />
-        </a>
+        </AppLink>
         <KidButton
           variant={saved ? "mint" : "primary"}
           ariaLabel="存檔"
@@ -243,7 +254,7 @@ export const DrawView = () => {
         </KidButton>
         {locked ? (
           <div className="ml-auto">
-            <UnlockHoldButton onUnlock={() => void unlock()} />
+            <UnlockButton onUnlock={() => void unlock()} />
           </div>
         ) : null}
       </header>
@@ -319,9 +330,10 @@ export const DrawView = () => {
               className="h-16 w-full text-xl"
               onClick={() => {
                 setQuotaFull(false);
-                // 回列表並重整，讓小朋友去丟掉舊畫
-                // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- full reload
-                window.location.assign("/");
+                if (locked) {
+                  void refreshGuards();
+                }
+                router.push("/");
               }}
             >
               <Home strokeWidth={3} className="h-8 w-8" />
