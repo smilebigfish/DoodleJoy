@@ -109,6 +109,25 @@ export const DrawView = () => {
   }, []);
   /* eslint-enable react-hooks/set-state-in-effect */
 
+  useEffect(() => {
+    const blockGesture = (event: Event) => {
+      event.preventDefault();
+    };
+    const blockPinch = (event: TouchEvent) => {
+      if (event.touches.length > 1) {
+        event.preventDefault();
+      }
+    };
+    document.addEventListener("gesturestart", blockGesture, { passive: false });
+    document.addEventListener("gesturechange", blockGesture, { passive: false });
+    document.addEventListener("touchmove", blockPinch, { passive: false });
+    return () => {
+      document.removeEventListener("gesturestart", blockGesture);
+      document.removeEventListener("gesturechange", blockGesture);
+      document.removeEventListener("touchmove", blockPinch);
+    };
+  }, []);
+
   const handleZoom = (next: number) => {
     setZoom(next);
     if (next <= 1) {
@@ -290,7 +309,6 @@ export const DrawView = () => {
             overlaySrc={overlaySrc}
             aspectRatio={ratioForOrientation(orientation)}
             zoom={zoom}
-            onZoomChange={handleZoom}
             onHistoryChange={(state) => {
               setCanUndo(state.canUndo);
               setCanRedo(state.canRedo);

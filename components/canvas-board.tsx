@@ -13,11 +13,9 @@ import {
   paintStroke,
   redrawStrokes,
   PAPER,
-  type Point,
   type Stroke,
   type Tool,
 } from "@/lib/drawing";
-import { clampZoom } from "@/lib/zoom";
 
 export type CanvasBoardHandle = {
   undo: () => void;
@@ -33,7 +31,6 @@ type CanvasBoardProps = {
   overlaySrc?: string | null;
   aspectRatio: number | null;
   zoom: number;
-  onZoomChange: (zoom: number) => void;
   onHistoryChange: (state: { canUndo: boolean; canRedo: boolean }) => void;
 };
 
@@ -49,7 +46,6 @@ export const CanvasBoard = forwardRef<CanvasBoardHandle, CanvasBoardProps>(
       overlaySrc = null,
       aspectRatio,
       zoom,
-      onZoomChange,
       onHistoryChange,
     },
     ref,
@@ -74,15 +70,6 @@ export const CanvasBoard = forwardRef<CanvasBoardHandle, CanvasBoardProps>(
     const historyCbRef = useRef(onHistoryChange);
     const zoomRef = useRef(zoom);
     const panRef = useRef({ x: 0, y: 0 });
-    const pointersRef = useRef(new Map<number, Point>());
-    const pinchRef = useRef<{
-      distance: number;
-      zoom: number;
-      panX: number;
-      panY: number;
-      midX: number;
-      midY: number;
-    } | null>(null);
 
     colorRef.current = color;
     sizeRef.current = size;
@@ -295,41 +282,6 @@ export const CanvasBoard = forwardRef<CanvasBoardHandle, CanvasBoardProps>(
       }
     };
 
-    const twoPointerState = () => {
-      const points = [...pointersRef.current.values()];
-      if (points.length < 2) {
-        return null;
-      }
-      const [first, second] = points;
-      const distance = Math.hypot(first.x - second.x, first.y - second.y);
-      return {
-        distance,
-        midX: (first.x + second.x) / 2,
-        midY: (first.y + second.y) / 2,
-      };
-    };
-
-    const applyPinch = () => {
-      const pinch = pinchRef.current;
-      const two = twoPointerState();
-      const stage = stageRef.current;
-      if (!pinch || !two || !stage || two.distance < 8) {
-        return;
-      }
-      const rect = stage.getBoundingClientRect();
-      const nextZoom = clampZoom(pinch.zoom * (two.distance / pinch.distance));
-      const localX = pinch.midX - rect.left;
-      const localY = pinch.midY - rect.top;
-      const worldX = (localX - pinch.panX) / pinch.zoom;
-      const worldY = (localY - pinch.panY) / pinch.zoom;
-      zoomRef.current = nextZoom;
-      panRef.current.x = localX - worldX * nextZoom + (two.midX - pinch.midX);
-      panRef.current.y = localY - worldY * nextZoom + (two.midY - pinch.midY);
-      clampPan();
-      applyTransform();
-      onZoomChange(nextZoom);
-    };
-
     useImperativeHandle(ref, () => ({
       undo: () => {
         if (cursorRef.current <= 0) {
@@ -424,6 +376,31 @@ export const CanvasBoard = forwardRef<CanvasBoardHandle, CanvasBoardProps>(
     }, [zoom]);
 
     useEffect(() => {
+      const stage = stageRef.current;
+      if (!stage) {
+        return;
+      }
+      const blockGesture = (event: Event) => {
+        event.preventDefault();
+      };
+      const blockPinchWheel = (event: WheelEvent) => {
+        if (event.ctrlKey || event.metaKey) {
+          event.preventDefault();
+        }
+      };
+      stage.addEventListener("gesturestart", blockGesture);
+      stage.addEventListener("gesturechange", blockGesture);
+      stage.addEventListener("gestureend", blockGesture);
+      stage.addEventListener("wheel", blockPinchWheel, { passive: false });
+      return () => {
+        stage.removeEventListener("gesturestart", blockGesture);
+        stage.removeEventListener("gesturechange", blockGesture);
+        stage.removeEventListener("gestureend", blockGesture);
+        stage.removeEventListener("wheel", blockPinchWheel);
+      };
+    }, []);
+
+    useEffect(() => {
       if (!backgroundSrc) {
         backgroundImageRef.current = null;
         paintBackground();
@@ -467,32 +444,11 @@ export const CanvasBoard = forwardRef<CanvasBoardHandle, CanvasBoardProps>(
 
     const handlePointerDown = (event: React.PointerEvent<HTMLCanvasElement>) => {
       event.preventDefault();
-      pointersRef.current.set(event.pointerId, {
-        x: event.clientX,
-        y: event.clientY,
-      });
-      event.currentTarget.setPointerCapture(event.pointerId);
-
-      if (pointersRef.current.size >= 2) {
-        cancelDrawing();
-        panningRef.current = false;
-        const two = twoPointerState();
-        if (two) {
-          pinchRef.current = {
-            distance: two.distance,
-            zoom: zoomRef.current,
-            panX: panRef.current.x,
-            panY: panRef.current.y,
-            midX: two.midX,
-            midY: two.midY,
-          };
-        }
-        return;
-      }
-
       if (!event.isPrimary) {
+        cancelDrawing();
         return;
       }
+      event.currentTarget.setPointerCapture(event.pointerId);
 
       const activeTool = toolRef.current;
       if (activeTool === "pan") {
@@ -529,17 +485,10 @@ export const CanvasBoard = forwardRef<CanvasBoardHandle, CanvasBoardProps>(
 
     const handlePointerMove = (event: React.PointerEvent<HTMLCanvasElement>) => {
       event.preventDefault();
-      if (pointersRef.current.has(event.pointerId)) {
-        pointersRef.current.set(event.pointerId, {
-          x: event.clientX,
-          y: event.clientY,
-        });
-      }
-      if (pointersRef.current.size >= 2) {
-        applyPinch();
+      if (!event.isPrimary) {
         return;
       }
-      if (panningRef.current && event.isPrimary) {
+      if (panningRef.current) {
         const start = panStartRef.current;
         panRef.current.x = start.panX + (event.clientX - start.x);
         panRef.current.y = start.panY + (event.clientY - start.y);
@@ -547,7 +496,7 @@ export const CanvasBoard = forwardRef<CanvasBoardHandle, CanvasBoardProps>(
         applyTransform();
         return;
       }
-      if (!drawingRef.current || !event.isPrimary) {
+      if (!drawingRef.current) {
         return;
       }
       const stroke = strokesRef.current[strokesRef.current.length - 1];
@@ -564,13 +513,6 @@ export const CanvasBoard = forwardRef<CanvasBoardHandle, CanvasBoardProps>(
     };
 
     const handlePointerUp = (event: React.PointerEvent<HTMLCanvasElement>) => {
-      pointersRef.current.delete(event.pointerId);
-      if (pointersRef.current.size < 2) {
-        if (pinchRef.current) {
-          scheduleHiRes();
-        }
-        pinchRef.current = null;
-      }
       if (!event.isPrimary) {
         return;
       }
