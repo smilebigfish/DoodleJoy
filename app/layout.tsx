@@ -38,9 +38,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="zh-Hant"
-      className={`${fredoka.variable} ${notoSansTc.variable} h-full antialiased`}
+      className={`${fredoka.variable} ${notoSansTc.variable} h-full overflow-hidden antialiased`}
     >
-      <body className="min-h-full bg-cream font-sans text-ink">
+      <body className="h-full overflow-hidden bg-cream font-sans text-ink">
         <ScreenLockProvider>{children}</ScreenLockProvider>
       </body>
     </html>

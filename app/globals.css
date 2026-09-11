@@ -26,7 +26,17 @@
 body {
   background: var(--cream);
   color: var(--ink);
+  overflow: hidden;
   overscroll-behavior: none;
+}
+
+html {
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+html[data-screen-locked="1"] {
+  touch-action: none;
 }
 
 .kid-press {

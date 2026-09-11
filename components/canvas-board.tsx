@@ -466,6 +466,7 @@ export const CanvasBoard = forwardRef<CanvasBoardHandle, CanvasBoardProps>(
     }, [overlaySrc]);
 
     const handlePointerDown = (event: React.PointerEvent<HTMLCanvasElement>) => {
+      event.preventDefault();
       pointersRef.current.set(event.pointerId, {
         x: event.clientX,
         y: event.clientY,
@@ -527,6 +528,7 @@ export const CanvasBoard = forwardRef<CanvasBoardHandle, CanvasBoardProps>(
     };
 
     const handlePointerMove = (event: React.PointerEvent<HTMLCanvasElement>) => {
+      event.preventDefault();
       if (pointersRef.current.has(event.pointerId)) {
         pointersRef.current.set(event.pointerId, {
           x: event.clientX,

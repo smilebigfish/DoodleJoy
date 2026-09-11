@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Check, Home, ImagePlus, Redo2, Save, Undo2, ZoomIn, ZoomOut } from "lucide-react";
+import { Check, Home, ImagePlus, Lock, Redo2, Save, Undo2, ZoomIn, ZoomOut } from "lucide-react";
 import { CanvasBoard, type CanvasBoardHandle } from "@/components/canvas-board";
 import { KidButton } from "@/components/kid-button";
 import { OrientationSheet } from "@/components/orientation-sheet";
@@ -26,12 +26,11 @@ import {
 } from "@/lib/session-art";
 import { CRAYON_COLORS } from "@/lib/palette";
 import { MAX_ZOOM, MIN_ZOOM, nextZoomIn, nextZoomOut } from "@/lib/zoom";
-import { cn } from "@/lib/cn";
 
 export const DrawView = () => {
   const boardRef = useRef<CanvasBoardHandle>(null);
   const fileRef = useRef<HTMLInputElement>(null);
-  const { locked, unlock, refreshGuards } = useScreenLock();
+  const { locked, lock, unlock, refreshGuards } = useScreenLock();
   const router = useRouter();
   const [backgroundSrc, setBackgroundSrc] = useState<string | null>(null);
   const [overlaySrc, setOverlaySrc] = useState<string | null>(null);
@@ -247,16 +246,23 @@ export const DrawView = () => {
         <KidButton
           variant="sun"
           ariaLabel="選照片當底圖"
-          className={cn("h-12 w-12 rounded-full px-0", !locked && "ml-auto")}
+          className="ml-auto h-12 w-12 rounded-full px-0"
           onClick={() => fileRef.current?.click()}
         >
           <ImagePlus strokeWidth={3} className="h-6 w-6" />
         </KidButton>
         {locked ? (
-          <div className="ml-auto">
-            <UnlockButton onUnlock={() => void unlock()} />
-          </div>
-        ) : null}
+          <UnlockButton onUnlock={() => void unlock()} />
+        ) : (
+          <KidButton
+            variant="sun"
+            ariaLabel="鎖定螢幕"
+            className="h-12 w-12 rounded-full px-0"
+            onClick={() => void lock()}
+          >
+            <Lock strokeWidth={3} className="h-6 w-6" />
+          </KidButton>
+        )}
       </header>
       <input
         ref={fileRef}

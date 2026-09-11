@@ -1,17 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Lock, PencilLine, Settings } from "lucide-react";
+import { PencilLine, Settings } from "lucide-react";
 import { BlobDecor } from "@/components/blob-decor";
 import { Gallery } from "@/components/gallery";
-import { KidButton } from "@/components/kid-button";
-import { UnlockButton } from "@/components/unlock-button";
 import { AppLink, useScreenLock } from "@/components/screen-lock-provider";
 import { listArtworks, type Artwork } from "@/lib/db";
 import { setPendingSession } from "@/lib/session-art";
 
 export const HomeView = () => {
-  const { locked, lock, unlock } = useScreenLock();
+  const { locked } = useScreenLock();
   const [artworks, setArtworks] = useState<Artwork[]>([]);
 
   const handleLoad = async () => {
@@ -65,9 +63,9 @@ export const HomeView = () => {
         </section>
       </main>
 
-      <div className="pointer-events-none absolute right-5 bottom-[max(1.25rem,env(safe-area-inset-bottom))] z-30">
-        <div className="pointer-events-auto flex items-center gap-3">
-          {!locked ? (
+      {!locked ? (
+        <div className="pointer-events-none absolute right-5 bottom-[max(1.25rem,env(safe-area-inset-bottom))] z-30">
+          <div className="pointer-events-auto">
             <AppLink
               href="/settings"
               ariaLabel="設定"
@@ -75,24 +73,9 @@ export const HomeView = () => {
             >
               <Settings strokeWidth={3} className="h-7 w-7" />
             </AppLink>
-          ) : null}
-          {locked ? (
-            <UnlockButton
-              className="h-14 w-14 md:h-16 md:w-16"
-              onUnlock={() => void unlock()}
-            />
-          ) : (
-            <KidButton
-              variant="sun"
-              ariaLabel="鎖定螢幕"
-              className="h-14 w-14 rounded-full px-0 md:h-16 md:w-16"
-              onClick={() => void lock()}
-            >
-              <Lock strokeWidth={3} className="h-7 w-7" />
-            </KidButton>
-          )}
+          </div>
         </div>
-      </div>
+      ) : null}
     </div>
   );
 };
